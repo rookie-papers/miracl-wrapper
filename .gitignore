@@ -1,0 +1,21 @@
+# Prerequisites
+*.d
+*.obj
+*.o
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+
+# CMake build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+out/
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.DS_Store
