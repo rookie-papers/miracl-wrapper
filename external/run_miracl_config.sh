@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 切换到 miracl_core/cpp 目录
+# Navigate to the miracl_core/cpp directory
 cd "$(dirname "$0")/miracl_core/cpp" || exit 1
 
-# 自动输入曲线编号并运行配置脚本
+# Automatically input the curve number and run the configuration script
 echo -e "31\n0\n" | python3 config64.py
