@@ -236,6 +236,8 @@ void Test_Variadic_Hash() {
 int main() {
     cout << "=== Running Wrapper Verification ===" << endl;
 
+    mpz_class order = getCurveOrder();
+    show_mpz(order.get_mpz_t());
     Test_GMP_Convenience();
     Test_Conversion_And_ECP_Adapter();
     Test_FP12_Adapter();

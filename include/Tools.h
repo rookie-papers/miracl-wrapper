@@ -28,6 +28,8 @@ using namespace chrono;
  */
 void initRNG(csprng *rng);
 
+mpz_class getCurveOrder();
+
 /**
  * Generates a random 256-bit number in the Fq field, where q is the order of the BLS12381 curve.
  * Note: Run initRNG before calling this function to initialize the seed.

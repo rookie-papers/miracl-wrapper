@@ -17,6 +17,11 @@ void initRNG(csprng *rng) {
     CREATE_CSPRNG(rng, &RAW);
 }
 
+mpz_class getCurveOrder(){
+    BIG order;
+    BIG_rcopy(order, CURVE_Order);
+    return BIG_to_mpz(order);
+}
 
 void randBig(BIG big, csprng &rng) {
     BIG mod;
