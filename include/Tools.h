@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 #include <pair_BLS12381.h>
 #include <bls_BLS12381.h>
