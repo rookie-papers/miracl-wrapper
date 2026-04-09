@@ -311,16 +311,17 @@ void Miracl_hash(benchmark::State &state) {
     }
 }
 
-void Miracl_hashToPoint(benchmark::State &state) {
+void Miracl_hashToG1(benchmark::State &state) {
     initState(state_BM);
     mpz_class a = rand_mpz(state_BM);
     BIG order;
     BIG_rcopy(order, CURVE_Order);
     mpz_class q = BIG_to_mpz(order);
     ECP P;
+    ECP ret;
 
     for (auto _: state) {
-        P = hashToPoint(a, q);
+        HashToG1(ret,a, q);
     }
 }
 
@@ -403,7 +404,7 @@ BENCHMARK(Miracl_GT_pow);
 
 // Utils
 BENCHMARK(Miracl_hash);
-BENCHMARK(Miracl_hashToPoint);
+BENCHMARK(Miracl_hashToG1);
 BENCHMARK(Miracl_AES_Enc);
 BENCHMARK(Miracl_AES_Dec);
 

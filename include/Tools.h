@@ -212,50 +212,12 @@ bool concatOctet(octet *oc1, const octet *oc2);
 void hashZp256(BIG res, octet *ct, BIG q);
 
 /**
- * Hashes a BIG integer to a 256-bit integer
- * @param res Hash result
- * @param beHashed Integer to hash
- * @param q Order of the elliptic curve to mod the hash result
- */
-void hashToZp256(BIG res, BIG beHashed, BIG q);
-
-/**
- * Hashes an mpz_class integer to a 256-bit integer
- * @param res Hash result
- * @param beHashed Integer to hash
- * @param q Order of the elliptic curve to mod the hash result
- */
-mpz_class hashToZp256(mpz_class beHashed, mpz_class q);
-
-/**
- * Hashes a 256-bit integer to a point on the G1 group
- * @param big Integer to hash
- * @param q Order of the elliptic curve to mod the hash result
- */
-ECP hashToPoint(BIG big, BIG q);
-
-/**
- * Hashes a 256-bit integer to a point on the G2 group
- * @param big Integer to hash
- * @param q Order of the elliptic curve to mod the hash result
- */
-ECP hashToPoint(mpz_class big, mpz_class q);
-
-/**
  * Bilinear pairing
  * @param alpha1 Element on G1
  * @param alpha2 Element on G2
  * @return Result of bilinear pairing, an element on GT
  */
 FP12 e(ECP P1, ECP2 P2);
-
-/**
- * Computes the modular multiplicative inverse of an integer a under modulo m, result stored in res
- * @param res Stores the multiplicative inverse
- * @param a Integer to find the inverse of
- * @param m Modulus
- */
-void BIG_inv(BIG &res, const BIG a, const BIG m);
 
 /**
  * Outputs a BIG integer in hexadecimal format, including a newline
@@ -274,3 +236,138 @@ void showFP12(FP12 fp12);
  * @param text Text content of the separator line
  */
 void printLine(const string& text);
+
+
+
+
+// ============================================================================
+// Variadic Template Hash Functions
+// ============================================================================
+
+
+// ------------------------------------------------------------------
+// Append string
+inline void appendToOctet(octet* hash, const string& str) {
+    octet temp = getOctet(1024);
+    temp.len = str.length();
+    memcpy(temp.val, str.c_str(), temp.len);
+    concatOctet(hash, &temp);
+    free(temp.val);
+}
+
+// Append mpz_class
+inline void appendToOctet(octet* hash, const mpz_class& num) {
+    appendToOctet(hash, num.get_str(16));
+}
+
+// Append MIRACL BIG type
+inline void appendToOctet(octet* hash, BIG b) {
+    appendToOctet(hash, BIG_to_mpz(b));
+}
+
+// Append G1 element (ECP)
+inline void appendToOctet(octet* hash, ECP pt) {
+    octet temp = getOctet(1024);
+    ECP_toOctet(&temp, &pt, true);
+    concatOctet(hash, &temp);
+    free(temp.val);
+}
+
+// Append G2 element (ECP2)
+inline void appendToOctet(octet* hash, ECP2 pt) {
+    octet temp = getOctet(1024);
+    ECP2_toOctet(&temp, &pt, true);
+    concatOctet(hash, &temp);
+    free(temp.val);
+}
+
+// Append GT element (FP12)
+inline void appendToOctet(octet* hash, FP12 pt) {
+    octet temp = getOctet(1024);
+    FP12_toOctet(&temp, &pt);
+    concatOctet(hash, &temp);
+    free(temp.val);
+}
+
+// Generic support for std::vector of any type T
+template<typename T>
+inline void appendToOctet(octet* hash, const vector<T>& vec) {
+    for (const auto& item : vec) {
+        // Automatically resolves to the correct appendToOctet based on T
+        appendToOctet(hash, item);
+    }
+}
+
+// ------------------------------------------------------------------
+
+
+// Base case to terminate recursion
+inline void hash_recursive(octet* hash) {}
+
+// Recursive step
+template<typename T, typename... Args>
+inline void hash_recursive(octet* hash, T first, Args... rest) {
+    appendToOctet(hash, first);        // Process the first argument
+    hash_recursive(hash, rest...);     // Recursively process the rest
+}
+
+// ------------------------------------------------------------------
+
+/**
+ * @brief Variadic hash function that maps any number of arguments to a Zp scalar.
+ * @tparam Args Template parameter pack for various types (mpz_class, ECP, ECP2, FP12, string, vector, etc.)
+ * @param args The sequence of arguments to be hashed.
+ * @return The resulting hash as a GMP mpz_class integer modulo the curve order.
+ */
+template<typename... Args>
+inline mpz_class HashToZp(Args... args) {
+    octet hash = getOctet(8192);
+    hash_recursive(&hash, args...);
+    BIG order, ret;
+    BIG_rcopy(order, CURVE_Order);
+    hashZp256(ret, &hash, order);
+    free(hash.val);
+    return BIG_to_mpz(ret);
+}
+
+/**
+ * @brief Variadic hash function that maps any number of arguments to a point on the G1 group.
+ * @tparam Args Template parameter pack for various types.
+ * @param res Output parameter: the resulting ECP point on G1.
+ * @param args The sequence of arguments to be hashed.
+ */
+template<typename... Args>
+inline void HashToG1(ECP& res, Args... args) {
+    octet hash = getOctet(8192);
+    hash_recursive(&hash, args...);
+    BIG order, scalar;
+    BIG_rcopy(order, CURVE_Order);
+    hashZp256(scalar, &hash, order);
+
+    // Map scalar to G1: res = scalar * G1_generator
+    ECP_generator(&res);
+    ECP_mul(&res, scalar);
+
+    free(hash.val);
+}
+
+/**
+ * @brief Variadic hash function that maps any number of arguments to a point on the G2 group.
+ * @tparam Args Template parameter pack for various types.
+ * @param res Output parameter: the resulting ECP2 point on G2.
+ * @param args The sequence of arguments to be hashed.
+ */
+template<typename... Args>
+inline void HashToG2(ECP2& res, Args... args) {
+    octet hash = getOctet(8192);
+    hash_recursive(&hash, args...);
+    BIG order, scalar;
+    BIG_rcopy(order, CURVE_Order);
+    hashZp256(scalar, &hash, order);
+
+    // Map scalar to G2: res = scalar * G2_generator
+    ECP2_generator(&res);
+    ECP2_mul(&res, scalar);
+
+    free(hash.val);
+}
