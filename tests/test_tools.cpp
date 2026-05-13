@@ -233,6 +233,210 @@ void Test_Variadic_Hash() {
     }
 }
 
+// ==================================================================
+// 5. Generic Serializer Test
+// ==================================================================
+
+struct DummyTestStruct {
+    int _int; short _short; long long _ll; bool _bool; std::string _str;
+    mpz_class _mpz; ECP _g1; ECP2 _g2; FP12 _gt;
+    std::vector<int> _v_int; std::vector<std::string> _v_str; std::vector<mpz_class> _v_mpz;
+    std::vector<ECP> _v_g1; std::vector<ECP2> _v_g2; std::vector<FP12> _v_gt;
+};
+
+std::string encode(const DummyTestStruct& obj) {
+    return GenericSerializer::serialize(
+        obj._int, obj._short, obj._ll, obj._bool, obj._str,
+        obj._mpz, obj._g1, obj._g2, obj._gt,
+        obj._v_int, obj._v_str, obj._v_mpz, obj._v_g1, obj._v_g2, obj._v_gt
+    );
+}
+
+void decode(const std::string& str, DummyTestStruct& obj) {
+    GenericSerializer::deserialize(str,
+        obj._int, obj._short, obj._ll, obj._bool, obj._str,
+        obj._mpz, obj._g1, obj._g2, obj._gt,
+        obj._v_int, obj._v_str, obj._v_mpz, obj._v_g1, obj._v_g2, obj._v_gt
+    );
+}
+
+// 5.3 Main function for serialization comprehensive testing
+void Test_Generic_Serializer() {
+    cout << "\n--- Test 5: Generic Serialization (Basic, Crypto, Vector, Struct) ---" << endl;
+
+    // A. Basic Types Test
+    {
+        int o_int = -12345; short o_short = 255; long long o_ll = 987654321012345LL;
+        bool o_bool = true; string o_str = "CryptoSerializationTest";
+
+        string s1 = GenericSerializer::serialize(o_int, o_short, o_ll, o_bool, o_str);
+        int r_int; short r_short; long long r_ll; bool r_bool; string r_str;
+        GenericSerializer::deserialize(s1, r_int, r_short, r_ll, r_bool, r_str);
+        string s2 = GenericSerializer::serialize(r_int, r_short, r_ll, r_bool, r_str);
+
+        if (s1 == s2) { TEST_PASS("Serializer: Basic Types"); } 
+        else { TEST_FAIL("Serializer: Basic Types mismatch"); }
+    }
+
+    // B. Cryptography Types Test
+    {
+        mpz_class o_mpz("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
+        ECP o_g1; ECP_generator(&o_g1); 
+        ECP2 o_g2; ECP2_generator(&o_g2); 
+        FP12 o_gt; FP12_one(&o_gt); 
+
+        string s1 = GenericSerializer::serialize(o_mpz, o_g1, o_g2, o_gt);
+        mpz_class r_mpz; ECP r_g1; ECP2 r_g2; FP12 r_gt;
+        GenericSerializer::deserialize(s1, r_mpz, r_g1, r_g2, r_gt);
+        string s2 = GenericSerializer::serialize(r_mpz, r_g1, r_g2, r_gt);
+
+        if (s1 == s2) { TEST_PASS("Serializer: Cryptography Types"); } 
+        else { TEST_FAIL("Serializer: Cryptography Types mismatch"); }
+    }
+
+    // C. Vector Types Test
+    {
+        vector<int> o_v_int = {1, 2, 3};
+        vector<string> o_v_str = {"Alice", "Bob"};
+        ECP g1; ECP_generator(&g1); ECP2 g2; ECP2_generator(&g2); FP12 gt; FP12_one(&gt);
+
+        vector<mpz_class> o_v_mpz = { mpz_class(10), mpz_class("10000000000", 16) };
+        vector<ECP> o_v_g1 = {g1, g1};
+        vector<ECP2> o_v_g2 = {g2, g2};
+        vector<FP12> o_v_gt = {gt, gt};
+
+        string s1 = GenericSerializer::serialize(o_v_int, o_v_str, o_v_mpz, o_v_g1, o_v_g2, o_v_gt);
+
+        vector<int> r_v_int; vector<string> r_v_str; vector<mpz_class> r_v_mpz;
+        vector<ECP> r_v_g1; vector<ECP2> r_v_g2; vector<FP12> r_v_gt;
+        GenericSerializer::deserialize(s1, r_v_int, r_v_str, r_v_mpz, r_v_g1, r_v_g2, r_v_gt);
+        string s2 = GenericSerializer::serialize(r_v_int, r_v_str, r_v_mpz, r_v_g1, r_v_g2, r_v_gt);
+
+        if (s1 == s2) { TEST_PASS("Serializer: Vector Types (Including Crypto)"); } 
+        else { TEST_FAIL("Serializer: Vector Types mismatch"); }
+    }
+
+    // D. Custom Struct Test
+    {
+        DummyTestStruct obj1;
+        obj1._int = 1001; obj1._short = 255; obj1._ll = 999999999LL;
+        obj1._bool = true; obj1._str = "ZKP_Protocol";
+        obj1._mpz = mpz_class("ABCDEF123456", 16);
+        ECP_generator(&obj1._g1); ECP2_generator(&obj1._g2); FP12_one(&obj1._gt);
+        obj1._v_int = {1, 2, 3}; obj1._v_str = {"UAV", "Auth"};
+        obj1._v_mpz = {mpz_class(1), mpz_class(2)};
+        obj1._v_g1 = {obj1._g1}; obj1._v_g2 = {obj1._g2}; obj1._v_gt = {obj1._gt};
+
+        string s1 = ::encode(obj1);
+        DummyTestStruct obj2;
+        ::decode(s1, obj2);
+        string s2 = ::encode(obj2);
+
+        if (s1 == s2) { TEST_PASS("Serializer: Ultimate Custom Struct (15 Types)"); } 
+        else { TEST_FAIL("Serializer: Custom Struct mismatch"); }
+    }
+
+    // E. Edge Cases
+    {
+        string o_empty_str = "";
+        vector<int> o_empty_vec;
+        bool o_false = false;
+
+        string s1 = GenericSerializer::serialize(o_empty_str, o_empty_vec, o_false);
+        string r_empty_str = "dirty_data"; 
+        vector<int> r_empty_vec = {1, 2, 3}; 
+        bool r_false = true;
+
+        GenericSerializer::deserialize(s1, r_empty_str, r_empty_vec, r_false);
+        string s2 = GenericSerializer::serialize(r_empty_str, r_empty_vec, r_false);
+
+        if (s1 == s2) { TEST_PASS("Serializer: Edge Cases (Empty data)"); } 
+        else { TEST_FAIL("Serializer: Edge Cases mismatch"); }
+    }
+}
+
+// ==================================================================
+// 6. Nested Struct & Vector of Structs Test (嵌套结构体测试)
+// ==================================================================
+
+// 6.1 定义内层结构体
+struct UAV_Info {
+    int uav_id;
+    mpz_class serial_number;
+    ECP public_key;
+};
+
+// 6.2 为内层结构体提供序列化图纸 (加上 Hex 装甲隔离分隔符)
+std::string encode(const UAV_Info& uav) {
+    std::string raw_data = GenericSerializer::serialize(uav.uav_id, uav.serial_number, uav.public_key);
+    return GenericSerializer::binToHex(raw_data); 
+}
+
+void decode(const std::string& str, UAV_Info& uav) {
+    std::string raw_data = GenericSerializer::hexToBin(str);
+    GenericSerializer::deserialize(raw_data, uav.uav_id, uav.serial_number, uav.public_key);
+}
+// ------------------------------------------------------------------
+
+// 6.3 定义外层结构体 (包含内层结构体，以及内层结构体的 Vector 容器)
+struct Fleet_Mission {
+    std::string mission_name;
+    UAV_Info leader;                 // 嵌套单体结构体
+    std::vector<UAV_Info> followers; // 嵌套结构体的容器！(终极测试)
+    mpz_class timestamp;
+};
+
+// 6.4 为外层结构体提供序列化图纸
+std::string encode(const Fleet_Mission& fm) {
+    // 这里的 fm.leader 和 fm.followers 会自动去调用上面 UAV_Info 的 encode
+    return GenericSerializer::serialize(fm.mission_name, fm.leader, fm.followers, fm.timestamp);
+}
+void decode(const std::string& str, Fleet_Mission& fm) {
+    GenericSerializer::deserialize(str, fm.mission_name, fm.leader, fm.followers, fm.timestamp);
+}
+
+// ------------------------------------------------------------------
+
+// 6.5 测试函数
+void Test_Nested_Struct() {
+    cout << "\n--- Test 6: Nested Structs & Struct Vectors ---" << endl;
+
+    // A. 构造复杂的嵌套测试数据
+    Fleet_Mission original_mission;
+    original_mission.mission_name = "Operation_Nightfall";
+    original_mission.timestamp = mpz_class("1688123456789");
+
+    // 赋值 Leader
+    original_mission.leader.uav_id = 1;
+    original_mission.leader.serial_number = mpz_class("AAA111", 16);
+    ECP_generator(&original_mission.leader.public_key);
+
+    // 赋值 Followers (包含两个 UAV_Info)
+    UAV_Info f1, f2;
+    f1.uav_id = 2; f1.serial_number = mpz_class("BBB222", 16); ECP_generator(&f1.public_key);
+    f2.uav_id = 3; f2.serial_number = mpz_class("CCC333", 16); ECP_generator(&f2.public_key);
+    original_mission.followers = {f1, f2};
+
+    // B. 一键序列化整个外层结构体
+    string serialized_data = ::encode(original_mission);
+    
+    // C. 反序列化到新对象中
+    Fleet_Mission recovered_mission;
+    ::decode(serialized_data, recovered_mission);
+
+    // D. 重新序列化比对
+    string secondary_data = ::encode(recovered_mission);
+
+    if (serialized_data == secondary_data) { 
+        TEST_PASS("Serializer: Nested Structs & Struct Vectors"); 
+    } else { 
+        TEST_FAIL("Serializer: Nested Structs mismatch"); 
+    }
+}
+
+// ==================================================================
+// Main Execution
+// ==================================================================
 int main() {
     cout << "=== Running Wrapper Verification ===" << endl;
 
@@ -241,7 +445,9 @@ int main() {
     Test_GMP_Convenience();
     Test_Conversion_And_ECP_Adapter();
     Test_FP12_Adapter();
-    Test_Variadic_Hash(); // New Test suite added here
+    Test_Variadic_Hash();
+    Test_Generic_Serializer(); 
+    Test_Nested_Struct();
 
     cout << "\n=== All Tests Passed ===" << endl;
     return 0;

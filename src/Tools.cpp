@@ -333,3 +333,160 @@ void printLine(const string &text) {
     cout << "--------------------------------------------------\t " + text +
             " \t--------------------------------------------------" << endl;
 }
+
+
+namespace GenericSerializer {
+
+    std::string binToHex(const std::string& input) {
+        static const char* const lut = "0123456789ABCDEF";
+        size_t len = input.length();
+        std::string output;
+        output.reserve(2 * len);
+        for (size_t i = 0; i < len; ++i) {
+            const unsigned char c = input[i];
+            output.push_back(lut[c >> 4]);
+            output.push_back(lut[c & 15]);
+        }
+        return output;
+    }
+
+    std::string hexToBin(const std::string& input) {
+        size_t len = input.length();
+        if (len & 1) throw std::invalid_argument("Odd length in hex string");
+        std::string output;
+        output.reserve(len / 2);
+        for (size_t i = 0; i < len; i += 2) {
+            std::string byteString = input.substr(i, 2);
+            char byte = (char)strtol(byteString.c_str(), NULL, 16);
+            output.push_back(byte);
+        }
+        return output;
+    }
+
+std::vector<std::string> split(const std::string& s, char delimiter) {
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while (std::getline(tokenStream, token, delimiter)) {
+        tokens.push_back(token);
+    }
+    if (!s.empty() && s.back() == delimiter) {
+        tokens.push_back("");
+    }
+    return tokens;
+}
+
+// --- Cryptographic types ---
+
+std::string encode(const mpz_class& val) {
+    return val.get_str(16);
+}
+
+void decode(const std::string& str, mpz_class& val) {
+    val = mpz_class(str, 16);
+}
+
+std::string encode(const ECP& val) {
+    char buffer[64];
+    octet O;
+    O.len = 0;
+    O.max = sizeof(buffer);
+    O.val = buffer;
+    ECP_toOctet(&O, const_cast<ECP*>(&val), true);
+    std::string binaryData(O.val, O.len);
+    return binToHex(binaryData);
+}
+
+void decode(const std::string& str, ECP& val) {
+    std::string binaryData = hexToBin(str);
+    char buffer[64];
+    if(binaryData.size() > 64) throw std::runtime_error("ECP string too long");
+    memcpy(buffer, binaryData.data(), binaryData.size());
+    octet O;
+    O.len = (int)binaryData.size();
+    O.max = sizeof(buffer);
+    O.val = buffer;
+    if (ECP_fromOctet(&val, &O) != 1) {
+        std::cerr << "[Error] Failed to deserialize ECP (point not on curve)." << std::endl;
+        ECP_inf(&val);
+    }
+}
+
+std::string encode(const ECP2& val) {
+    char buffer[2 * 48 * 2];
+    octet S;
+    S.val = buffer;
+    S.max = sizeof(buffer);
+    S.len = 0;
+    ECP2_toOctet(&S, const_cast<ECP2*>(&val), true);
+    std::string hex_string;
+    for (int i = 0; i < S.len; i++) {
+        char hex[3];
+        sprintf(hex, "%02X", (unsigned char) S.val[i]);
+        hex_string.append(hex);
+    }
+    return hex_string;
+}
+
+void decode(const std::string& str, ECP2& val) {
+    size_t len = str.length() / 2;
+    char buffer[len];
+    for (size_t i = 0; i < len; i++) {
+        sscanf(str.substr(i * 2, 2).c_str(), "%2hhX", &buffer[i]);
+    }
+    octet S;
+    S.val = buffer;
+    S.max = len;
+    S.len = len;
+    if (ECP2_fromOctet(&val, &S) != 1) {
+        std::cerr << "Invalid ECP2 point representation." << std::endl;
+    }
+}
+
+std::string encode(const FP12& val) {
+    char buffer[24 * 48];
+    octet S;
+    S.val = buffer;
+    S.max = sizeof(buffer);
+    S.len = 0;
+    FP12_toOctet(&S, const_cast<FP12*>(&val));
+    std::string hex_string;
+    for (int i = 0; i < S.len; i++) {
+        char hex[3];
+        sprintf(hex, "%02X", (unsigned char) S.val[i]);
+        hex_string.append(hex);
+    }
+    return hex_string;
+}
+
+void decode(const std::string& str, FP12& val) {
+    size_t len = str.length() / 2;
+    char buffer[len];
+    for (size_t i = 0; i < len; i++) {
+        sscanf(str.substr(i * 2, 2).c_str(), "%2hhX", &buffer[i]);
+    }
+    octet S;
+    S.val = buffer;
+    S.max = len;
+    S.len = len;
+    FP12_fromOctet(&val, &S);
+}
+
+// --- Standard types ---
+
+std::string encode(const std::string& val) { return val; }
+void decode(const std::string& str, std::string& val) { val = str; }
+
+std::string encode(int val) { return std::to_string(val); }
+void decode(const std::string& str, int& val) { val = std::stoi(str); }
+
+std::string encode(short val) { return std::to_string(val); }
+void decode(const std::string& str, short& val) { val = static_cast<short>(std::stoi(str)); }
+
+std::string encode(long long val) { return std::to_string(val); }
+void decode(const std::string& str, long long& val) { val = std::stoll(str); }
+
+std::string encode(bool val) { return val ? "1" : "0"; }
+void decode(const std::string& str, bool& val) { val = (str == "1" || str == "true"); }
+
+} // namespace GenericSerializer

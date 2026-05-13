@@ -15,6 +15,8 @@
 #include <chrono>
 #include <random>
 #include <cassert>
+#include <string>
+#include <stdexcept>
 
 using namespace B384_58;
 using namespace BLS12381;
@@ -374,3 +376,143 @@ inline void HashToG2(ECP2& res, Args... args) {
 
     free(hash.val);
 }
+
+namespace GenericSerializer {
+
+std::string binToHex(const std::string& input);
+std::string hexToBin(const std::string& input);
+
+// ============================================================================
+// 1. Base Type Converters Declarations
+// Implemented in the .cpp file. Compiler automatically deduces the correct 
+// overloaded function based on the parameter type.
+// ============================================================================
+
+// --- Cryptographic Types ---
+std::string encode(const mpz_class& val);
+void decode(const std::string& str, mpz_class& val);
+
+std::string encode(const ECP& val);
+void decode(const std::string& str, ECP& val);
+
+std::string encode(const ECP2& val);
+void decode(const std::string& str, ECP2& val);
+
+std::string encode(const FP12& val);
+void decode(const std::string& str, FP12& val);
+
+// --- Standard C++ Types ---
+std::string encode(const std::string& val);
+void decode(const std::string& str, std::string& val);
+
+std::string encode(int val);
+void decode(const std::string& str, int& val);
+
+std::string encode(short val);
+void decode(const std::string& str, short& val);
+
+std::string encode(long long val);
+void decode(const std::string& str, long long& val);
+
+std::string encode(bool val);
+void decode(const std::string& str, bool& val);
+
+// --- Utility Functions ---
+/**
+ * @brief Splits a string into a vector of substrings based on a specified delimiter.
+ */
+std::vector<std::string> split(const std::string& s, char delimiter);
+
+
+// ============================================================================
+// 2. Vector Support (Template Implementation)
+// Uses a comma ',' as the delimiter for elements within a vector.
+// ============================================================================
+
+template <typename T>
+std::string encode(const std::vector<T>& vec) {
+    std::ostringstream oss;
+    for (size_t i = 0; i < vec.size(); ++i) {
+        oss << encode(vec[i]);
+        if (i != vec.size() - 1) {
+            oss << ",";
+        }
+    }
+    return oss.str();
+}
+
+template <typename T>
+void decode(const std::string& str, std::vector<T>& vec) {
+    vec.clear();
+    if (str.empty()) return;
+    
+    std::vector<std::string> items = split(str, ',');
+    for (const auto& item : items) {
+        if (item.empty()) continue;
+        T val;
+        decode(item, val);
+        vec.push_back(val);
+    }
+}
+
+// ============================================================================
+// 3. Variadic Template Serialization (Core Logic)
+// Uses '#' as the delimiter between different fields.
+// ============================================================================
+
+// Base case for serialization recursion
+inline void serialize_recursive(std::ostringstream& oss) {}
+
+// Recursive step for serialization
+template<typename T, typename... Args>
+inline void serialize_recursive(std::ostringstream& oss, const T& first, const Args&... rest) {
+    oss << encode(first);
+    if (sizeof...(rest) > 0) {
+        oss << "#";
+    }
+    serialize_recursive(oss, rest...);
+}
+
+/**
+ * @brief Universal serialization function supporting an arbitrary number 
+ * of parameters of supported types.
+ * @return A single concatenated string representing the serialized data.
+ */
+template<typename... Args>
+std::string serialize(const Args&... args) {
+    std::ostringstream oss;
+    serialize_recursive(oss, args...);
+    return oss.str();
+}
+
+// ============================================================================
+// 4. Variadic Template Deserialization (Core Logic)
+// ============================================================================
+
+// Base case for deserialization recursion
+inline void deserialize_recursive(const std::vector<std::string>& fields, size_t& index) {}
+
+// Recursive step for deserialization
+template<typename T, typename... Args>
+inline void deserialize_recursive(const std::vector<std::string>& fields, size_t& index, T& first, Args&... rest) {
+    if (index >= fields.size()) {
+        throw std::runtime_error("Deserialization error: Not enough fields in the input string.");
+    }
+    decode(fields[index++], first);
+    deserialize_recursive(fields, index, rest...);
+}
+
+/**
+ * @brief Universal deserialization function. 
+ * Assigns parsed values directly to the passed references.
+ * @param data The serialized string.
+ * @param args The variables (passed by reference) to populate.
+ */
+template<typename... Args>
+void deserialize(const std::string& data, Args&... args) {
+    std::vector<std::string> fields = split(data, '#');
+    size_t index = 0;
+    deserialize_recursive(fields, index, args...);
+}
+
+} // namespace GenericSerializer
