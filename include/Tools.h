@@ -482,7 +482,7 @@ template<typename... Args>
 std::string serialize(const Args&... args) {
     std::ostringstream oss;
     serialize_recursive(oss, args...);
-    return oss.str();
+    return binToHex(oss.str());
 }
 
 // ============================================================================
@@ -510,9 +510,10 @@ inline void deserialize_recursive(const std::vector<std::string>& fields, size_t
  */
 template<typename... Args>
 void deserialize(const std::string& data, Args&... args) {
-    std::vector<std::string> fields = split(data, '#');
+    if (data.empty()) return;
+    std::string raw_data = hexToBin(data);
+    std::vector<std::string> fields = split(raw_data, '#'); 
     size_t index = 0;
     deserialize_recursive(fields, index, args...);
 }
-
 } // namespace GenericSerializer

@@ -366,15 +366,13 @@ struct UAV_Info {
     ECP public_key;
 };
 
-// 6.2 为内层结构体提供序列化图纸 (加上 Hex 装甲隔离分隔符)
+// 6.2 为内层结构体提供序列化图纸 (底层库已自动加装甲，不再需要手动转 Hex)
 std::string encode(const UAV_Info& uav) {
-    std::string raw_data = GenericSerializer::serialize(uav.uav_id, uav.serial_number, uav.public_key);
-    return GenericSerializer::binToHex(raw_data); 
+    return GenericSerializer::serialize(uav.uav_id, uav.serial_number, uav.public_key); 
 }
 
 void decode(const std::string& str, UAV_Info& uav) {
-    std::string raw_data = GenericSerializer::hexToBin(str);
-    GenericSerializer::deserialize(raw_data, uav.uav_id, uav.serial_number, uav.public_key);
+    GenericSerializer::deserialize(str, uav.uav_id, uav.serial_number, uav.public_key);
 }
 // ------------------------------------------------------------------
 
@@ -386,20 +384,20 @@ struct Fleet_Mission {
     mpz_class timestamp;
 };
 
-// 6.4 为外层结构体提供序列化图纸
+// 6.4 为外层结构体提供序列化图纸 (写法与内层完全一致)
 std::string encode(const Fleet_Mission& fm) {
-    // 这里的 fm.leader 和 fm.followers 会自动去调用上面 UAV_Info 的 encode
     return GenericSerializer::serialize(fm.mission_name, fm.leader, fm.followers, fm.timestamp);
 }
+
 void decode(const std::string& str, Fleet_Mission& fm) {
     GenericSerializer::deserialize(str, fm.mission_name, fm.leader, fm.followers, fm.timestamp);
 }
 
 // ------------------------------------------------------------------
 
-// 6.5 测试函数
+// 6.5 测试函数 (测试逻辑保持不变，验证底层自动装甲是否生效)
 void Test_Nested_Struct() {
-    cout << "\n--- Test 6: Nested Structs & Struct Vectors ---" << endl;
+    cout << "\n--- Test 6: Nested Structs & Struct Vectors (Auto-Hex Armor Version) ---" << endl;
 
     // A. 构造复杂的嵌套测试数据
     Fleet_Mission original_mission;
@@ -419,6 +417,9 @@ void Test_Nested_Struct() {
 
     // B. 一键序列化整个外层结构体
     string serialized_data = ::encode(original_mission);
+    
+    // 打印出来看看终极装甲的样子 (可选，用于调试验证)
+    // cout << "[DEBUG] Serialized Hex Payload: " << serialized_data << endl;
     
     // C. 反序列化到新对象中
     Fleet_Mission recovered_mission;
